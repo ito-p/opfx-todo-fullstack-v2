@@ -78,11 +78,11 @@ body は JSON の object で、`typeof done === 'boolean'` のときだけ受け
 - 代案: body なしで反転する(toggle)。Issue が「done を明示して送る」ので採らない。明示なら同じ要求の再送で結果が変わらない(Scenario「同じ値の再送」)。
 
 ### D5. web: 応答を待ってから描く(楽観的に描かない)
-チェックボックスの `click` は今までどおり `preventDefault()` で見た目の変化を止め、`api.updateTodo(id, !todo.done)` を呼び、成功したら返った todo で行を作り直して置き換える(`replaceWith`)。失敗したら何もしない。追加(POST)の成功後に描くのと同じ流れ。
+チェックボックスの `click` は今までどおり `preventDefault()` で見た目の変化を止め、`api.updateTodo(id, !todo.done)` を呼び、成功したら返った todo で行を作り直して置き換える(`replaceWith`)。失敗(`!res.ok` で throw、または `fetch` 自体の throw)したら行の見た目は変えず、D6 の旗だけを下ろす。追加(POST)の成功後に描くのと同じ流れ。
 - 代案: 押した瞬間に描き、失敗で戻す(楽観的)。速く見えるが、失敗の表示が無いまま見た目が戻ると押した人に理由が伝わらない。memory の server なので応答は速く、待つ方を採る。
 
 ### D6. 応答待ちの間の再押下を送らない
-行ごとに「送信中」の旗を持ち、立っている間の `click` は `preventDefault()` だけして送らない。応答後に行を作り直すので旗も消える。
+行ごとに「送信中」の旗を持ち、立っている間の `click` は `preventDefault()` だけして送らない。旗は成功でも失敗でも応答の後に必ず下ろす(`finally`)。成功では行を作り直すので新しい行は旗の下りた状態で始まり、失敗では同じ行の旗を下ろして再び押せるようにする(Scenario「切り替えの失敗」「切り替えの要求の失敗」)。
 - 代案: `disabled` にする。灰色の見た目になり T1・T1b の frame と違うので採らない(Issue 1 の D7 と同じ理由)。
 
 ### D7. 完了の見た目の CSS
@@ -93,7 +93,9 @@ body は JSON の object で、`typeof done === 'boolean'` のときだけ受け
 - 代案: SVG を CSS の `::after` と border で描き直す。Figma の asset と形がずれうるので採らない。
 
 ### D8. api と aria
-`web/src/api.ts` に `updateTodo(id: number, done: boolean): Promise<Todo>`(`PATCH /api/todos/${id}`、`content-type: application/json`、`!res.ok` で throw)を足す。チェックボックスの `aria-label` は未完了なら「<題名> を完了にする」、完了なら「<題名> を未完了に戻す」。
+`web/src/api.ts` に `updateTodo(id: number, done: boolean): Promise<Todo>`(`PATCH /api/todos/${id}`、`content-type: application/json`、`!res.ok` で throw)を足す。チェックボックスの `aria-label` は未完了なら「<題名> を完了にする」、完了なら「<題名> を未完了に戻す」(押したら何が起きるかを読み上げる。Issue 1 の「<題名> を完了にする」を引き継ぐ)。
+- 代案: `updateTodo(id, patch: Partial<Todo>)` で任意の項目を送れる形にする。API が受けるのは `done` だけ(D4)で、題名の編集は範囲外なので、受けない項目を送れる型は誤りを招く。採らない。
+- 代案: `aria-label` を状態に依らず「<題名> の完了」に固定し、状態は `checked` だけで伝える。読み上げは `checked` も伝えるので足りるが、Issue 1 が既に動作を言う形(「を完了にする」)を採っており、完了の行で同じ名前だと押すと何が起きるかがずれるので採らない。
 
 ## Risks / Trade-offs
 
