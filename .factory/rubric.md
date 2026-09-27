@@ -10,8 +10,9 @@ The reviewer reads this file. Text is for the reviewer; the part after `=>` is r
 
 ## rules
 - [ui] any change that adds, removes or alters a screen, a state of a screen or a transition between screens => design:required
-- [api] any change that adds, removes or alters an HTTP API (routes, request or response shapes, status codes) => human_review:proposal, design:required
-- [db] any change that adds or alters the database schema (tables, columns, indexes, migrations) => human_review:proposal, design:required
+- [api] any change that adds, removes or alters an HTTP API (routes, request or response shapes, status codes) => human_review:pr, design:required
+- [db] any change that adds or alters the database schema (tables, columns, indexes, migrations) => human_review:pr, design:required
+- [behavior-change] the change adds, removes or alters a requirement or a Scenario of the source of truth (observable behavior) => human_review:pr
 - [new-capability-design] the change creates a new capability => design:required
 - [docs-only] the change has skip_specs and touches only docs/ => mergeable_by:handler
 
