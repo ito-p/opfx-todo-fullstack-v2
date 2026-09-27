@@ -21,7 +21,7 @@ todo
 
 | 行 × 列 | 差分の群 | 線 |
 |---|---|---|
-| 0 行: T1(x 0)→ T1a(x 544)→ T1b(x 1088) | T1 → T1a → T1b | 群 `flow-lines`(2:26)に灰 #CCCCCC・太さ 10・矢印なしの線 2 本: 2:25「T1 -> T1a 差分」、5:20「T1a -> T1b 差分」 |
+| 0 行: T1(x 0)→ T1a(x 544)→ T1b(x 1088) | T1 → T1a → T1b | frame `flow-lines`(2:26)に灰 #CCCCCC・太さ 10・矢印なしの線 2 本: 2:25「T1 -> T1a 差分」、5:20「T1a -> T1b 差分」 |
 
 列の幅 = 480 + 64 = 544 で、規則(docs/design/README.md)どおり。線の始点 (480, 200) は T1 の右端の高さの中央、終点 (544, 200) は T1a の左端の高さの中央。
 
@@ -47,7 +47,7 @@ todo
 
 **Non-Goals:**
 - 完了の切り替え・削除・ファイルへの永続化(Issue 2・3・4)。T1b の描画。
-- 題名の長さの上限、web の失敗の表示(文言が Figma に無い)。
+- 題名の長さの上限、web の失敗の表示(文言も frame も Figma に無い)。起動時の `GET /api/todos` が失敗したときも失敗は表示せず、見出しと form だけを描く(行も 0 件の文も出さない)。表示は失敗の frame を足す後の Issue で決める。
 
 ## Decisions
 
@@ -87,6 +87,10 @@ frame は Noto Sans JP。`font-family: "Noto Sans JP", sans-serif` と書くだ�
 ### D9. workspaces と build
 root の `package.json` は `"test": "pnpm -r test"`、`"build": "pnpm -r build"`。server は `tsc`(`dist/` へ)、web は `tsc --noEmit && vite build`。`pnpm-workspace.yaml` に `packages: [server, web]` と、pnpm 10 が既定で止める install script を better-sqlite3 に許す `onlyBuiltDependencies`。lockfile は CI と同じ pnpm 10 で作る(手元の pnpm 12 の lockfile の形が CI と食い違わないように `npx pnpm@10 install`)。
 - 代案: `packageManager` で pnpm を固定する。CI の `pnpm/action-setup` の `version: 10` と二重指定になり action が失敗しうるので書かない。
+
+### D10. Figma の node 名の「checkbox(未完了)」
+既存の frame の node 名 `checkbox(未完了)`(6:2・6:3・6:4)は、役割の kebab-case の後に状態を括弧で足した形。docs/design/README.md の命名の規則に「状態で見た目が変わる部品は括弧で状態を足してよく、実装の class は役割の部分に揃える」という例外を書いて、この名前を規則の内に収める。Figma は変えない。
+- 代案: Figma の名前を `checkbox` / `checkbox-done` に直す後の change を残す。T1b の `checkbox(完了)` と対で状態が読みやすく、この change は frame を書かない方針なので採らない。
 
 ## Risks / Trade-offs
 

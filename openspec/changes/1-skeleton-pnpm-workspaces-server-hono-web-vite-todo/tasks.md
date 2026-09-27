@@ -18,3 +18,4 @@
 ## 4. 全体の確かめ
 
 - [ ] 4.1 root で通す。確かめ方: `npx pnpm@10 install --frozen-lockfile`、`pnpm test`(server と web の両方の試験が走る)、`pnpm build`(両方が build される)がすべて通り、`pnpm-lock.yaml` が lockfileVersion 9.0 で commit に含まれる
+- [ ] 4.2 docs/design を Figma から読み戻して検算する。確かめ方: Screens ページ(0:1)を `get_metadata` で読み戻し、`docs/design/README.md` の「検算の仕方」(1) 規則から求めた座標との不一致 0、(2) node の重なり 0、(3) 線の端点が辺の中央、(4) 線の色と太さ、がすべて満たされ、`docs/design/specs/T1-T1a.md` と `docs/design/screens.md` の値が T1(2:2)・T1a(2:16)の `get_design_context` と 1 つ残らず一致する
