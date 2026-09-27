@@ -20,4 +20,4 @@ The reviewer reads this file. Text is for the reviewer; the part after `=>` is r
 The no-match line also fills mergeable_by when matched rules leave it unset. Keep comments off the `=>` lines: the parser reads the whole rest of the line.
 
 - no-match => mergeable_by:handler
-- undecidable => human_review:proposal, mergeable_by:human
+- undecidable => human_review:pr, mergeable_by:human
