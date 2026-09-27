@@ -65,7 +65,7 @@ Figma には何も足さない、変えない(delete-button と T1a が既に在
 - 代案: 200 で消した todo を返す。Issue が「204(body なし)」と決めているので採らない。
 
 ### D2. id の読み方と 404: PATCH と同じ
-path の `:id` が `/^[1-9][0-9]*$/` に合わなければ table を引かずに 404(`01` も合わないので 404。同じ todo に複数の path を当てない。Issue 2 の D2 と同じ)。合えば `DELETE FROM todos WHERE id = ?` を走らせ、`changes` が 0 なら 404。
+path の `:id` が `/^[1-9][0-9]*$/` に合わなければ table を引かずに 404(先頭に 0 の付いた `01`・`001` も合わないので 404。同じ todo に複数の path を当てない。Issue 2 の D2 と同じ。spec の要求の文は「先頭に 0 の無い正の整数の 10 進表記」と書き、PATCH と DELETE の両方に Scenario「先頭に 0 の付いた id の…」を置いて揃える)。合えば `DELETE FROM todos WHERE id = ?` を走らせ、`changes` が 0 なら 404。
 - 代案: 先に `SELECT` で在るかを見てから `DELETE`。文が 2 つになり、間に他の要求が入る余地が残る。1 文の `changes` で判定する方が短く確かなので採らない。
 - 代案: 在っても無くても 204(冪等な DELETE)。Issue が「2 回目は 404」と決めているので採らない。
 
@@ -73,7 +73,7 @@ path の `:id` が `/^[1-9][0-9]*$/` に合わなければ table を引かずに
 `UPDATE todos SET done = ? WHERE id = ? RETURNING id, title, done` の結果が `undefined` なら、`toTodo` に渡さずに 404 `{ error }` を返す。`id` の最初の判定(`SELECT`)は残す(D3 of Issue 2: 存在しない id を body より先に 404 にするため)。
 - 代案: `SELECT` と `UPDATE` を 1 つの transaction にまとめる。body の読み込み(`await`)を挟むので transaction で囲めず、better-sqlite3 は同期なので `UPDATE` 1 文はそれ自体で原子的。結果の有無を見るだけで足りるので採らない。
 - 代案: body を先に読んでから `id` を判定する。判定の順(404 が 400 より先)が source of truth で決まっているので採らない。
-- 試験: `app.request` に `ReadableStream` の body を渡し、その stream が読まれる時(= `id` の判定の後)に `DELETE` を呼んでから JSON を流す。これで判定と更新の間の削除を決まった順で起こせる。
+- 試験: `app.request` に `ReadableStream` の body を(Node の `Request` が求める `duplex: 'half'` と一緒に)渡し、その stream が読まれる時(= `id` の判定の後)に `DELETE` を呼んでから JSON を流す。これで判定と更新の間の削除を決まった順で起こせる。
 
 ### D4. web: 応答を待ってから行を消す(楽観的に消さない)
 「削除」ボタンの `click` で `api.deleteTodo(todo.id)` を呼び、成功したら `item.remove()`。残った行が 0 なら `showEmpty()`(T1a)。Issue 2 の D5 と同じく、失敗の表示が無いまま行が戻ってくる動きを避ける。
@@ -82,6 +82,7 @@ path の `:id` が `/^[1-9][0-9]*$/` に合わなければ table を引かずに
 
 ### D5. 404 は「既に無い」として行を消す
 `api.deleteTodo` は status 204 と 404 をともに成功として返し(404 は「消すべき todo がもう無い」= 望んだ結果)、それ以外の `!res.ok` と `fetch` 自体の失敗で throw する。
+- この 404 の扱いは Issue に書かれていない判断(完了の切り替えでは 404 を失敗として行を残す、の非対称)なので、PR の本文に明記して人の review で確かめてもらう。
 - 代案: 404 も失敗として行を残す。server にもう無い todo の行が残り、何度押しても 404 で消せない行になる。採らない。
 - 代案: 404 で一覧を読み直す。他の画面での変化も拾えるが、Issue の範囲を越え、読み直しの失敗の扱いも要る。採らない。
 

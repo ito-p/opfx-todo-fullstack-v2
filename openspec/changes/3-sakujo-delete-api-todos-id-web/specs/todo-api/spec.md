@@ -1,7 +1,7 @@
 ## ADDED Requirements
 
 ### Requirement: todo の削除
-`DELETE /api/todos/:id` は、`id` の todo が在ればそれを消し、status 204 で body の無い応答を返さなければならない(SHALL)。消した todo は以後の `GET /api/todos` に含まれてはならず(MUST NOT)、他の todo とその順は変えてはならない(MUST NOT)。`id` が正の整数の 10 進表記でないか、その `id` の todo が無いとき(既に消した todo を含む)は status 404 で拒み、body は `error`(文字列)を持つ JSON の object でなければならない(SHALL)。拒んだとき todo を変えてはならない(MUST NOT)。
+`DELETE /api/todos/:id` は、`id` の todo が在ればそれを消し、status 204 で body の無い応答を返さなければならない(SHALL)。消した todo は以後の `GET /api/todos` に含まれてはならず(MUST NOT)、他の todo とその順は変えてはならない(MUST NOT)。`id` が先頭に 0 の無い正の整数の 10 進表記でないか、その `id` の todo が無いとき(既に消した todo を含む)は status 404 で拒み、body は `error`(文字列)を持つ JSON の object でなければならない(SHALL)。拒んだとき todo を変えてはならない(MUST NOT)。
 
 #### Scenario: 存在する todo の削除
 - **WHEN** `POST /api/todos` で「牛乳を買う」を作り、その `id` に `DELETE /api/todos/:id` を送る
@@ -24,13 +24,17 @@
 - **THEN** 1 回目の status は 204、2 回目の status は 404 で、2 回目の body は `error` を持つ
 
 #### Scenario: 数値として読めない id の削除
-- **WHEN** todo が 1 件在る状態で、`DELETE /api/todos/abc`、`/api/todos/1.5`、`/api/todos/0`、`/api/todos/-1`、`/api/todos/01` をそれぞれ送る
+- **WHEN** todo が 1 件在る状態で、`DELETE /api/todos/abc`、`/api/todos/1.5`、`/api/todos/0`、`/api/todos/-1` をそれぞれ送る
 - **THEN** どれも status は 404 で、body は `error` を持ち、一覧は送る前と同じである
+
+#### Scenario: 先頭に 0 の付いた id の削除
+- **WHEN** todo が 1 件(`id` が 1)在る状態で、`DELETE /api/todos/01` と `/api/todos/001` をそれぞれ送る
+- **THEN** どちらも status は 404 で、body は `error` を持ち、`id` が 1 の todo は一覧に残る
 
 ## MODIFIED Requirements
 
 ### Requirement: 不正な完了の切り替えの拒否
-`PATCH /api/todos/:id` は、`id` が正の整数の 10 進表記でないか、その `id` の todo が無いとき status 404 で拒まなければならない(SHALL)。`id` の todo が在り、body が JSON の object として読めないか、`done` が無いか、`done` が真偽値でないときは status 400 で拒まなければならない(SHALL)。`id` の判定を body の判定より先に行う(SHALL)。`id` の判定の後、完了状態を変える前にその todo が消えていたときも status 404 で拒まなければならず(SHALL)、status 500 を返してはならない(MUST NOT)。拒んだとき todo を変えてはならず(MUST NOT)、body は `error`(文字列)を持つ JSON の object でなければならない(SHALL)。
+`PATCH /api/todos/:id` は、`id` が先頭に 0 の無い正の整数の 10 進表記でないか、その `id` の todo が無いとき status 404 で拒まなければならない(SHALL)。`id` の todo が在り、body が JSON の object として読めないか、`done` が無いか、`done` が真偽値でないときは status 400 で拒まなければならない(SHALL)。`id` の判定を body の判定より先に行う(SHALL)。`id` の判定の後、完了状態を変える前にその todo が消えていたときも status 404 で拒まなければならず(SHALL)、status 500 を返してはならない(MUST NOT)。拒んだとき todo を変えてはならず(MUST NOT)、body は `error`(文字列)を持つ JSON の object でなければならない(SHALL)。
 
 #### Scenario: 存在しない id の拒否
 - **WHEN** todo が 1 件(`id` が n)在る状態で、`PATCH /api/todos/<n+1>` に `{"done":true}` を送る
@@ -43,6 +47,10 @@
 #### Scenario: 存在しない id と不正な body
 - **WHEN** 存在しない `id` に `{}` を送る
 - **THEN** status は 404 である(`id` の判定が先)
+
+#### Scenario: 先頭に 0 の付いた id の拒否
+- **WHEN** todo が 1 件(`id` が 1)在る状態で、`PATCH /api/todos/01` と `/api/todos/001` にそれぞれ `{"done":true}` を送る
+- **THEN** どちらも status は 404 で、body は `error` を持ち、`id` が 1 の todo の `done` は送る前と同じである
 
 #### Scenario: done の無い body の拒否
 - **WHEN** 在る todo に `{}` と `{"title":"掃除する"}` をそれぞれ送る
