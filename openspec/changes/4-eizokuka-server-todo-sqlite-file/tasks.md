@@ -10,7 +10,7 @@
 
 ## 3. 壊れた file の退避
 
-- [ ] 3.1 `openTodosDb` に D4〜D6 を足す(`quick_check` と `SQLITE_NOTADB`・`SQLITE_CORRUPT*` で壊れたと見分け、`db.close()` の後に `<basename>.corrupt-<YYYYMMDDTHHmmssSSSZ>` へ `renameSync`、名前が在れば `-1`・`-2` …、在れば `-journal`・`-wal`・`-shm` も同じく退避、`warn` に退避先の絶対 path を含む 1 行、それ以外の error はそのまま投げる)。todo-storage の Scenario「壊れた file の退避」「退避した file の中身の保持」「退避の後の保存」「同じ時刻の退避名の衝突」「退避の標準エラーへの記録」「directory を指す TODOS_DB_PATH」の題名をそのまま試験名にした試験を足す(衝突は `now` に `2026-09-27T03:15:00.123Z` を返す関数を渡す。標準エラーは `warn` の spy と、`warn` を渡さないときの `console.error` の spy で確かめる)。壊れた file の隣に置いた `<path>-journal` が退避名 + `-journal` に移り、元の path の隣に残らないことの試験も足す。確かめ方: `pnpm --filter server test` がすべて通る
+- [ ] 3.1 `openTodosDb` に D4〜D6 を足す(開く前に `statSync` で在って `isFile()` でない path は退避せずに投げ、`quick_check` と `SQLITE_NOTADB`・`SQLITE_CORRUPT*` で壊れたと見分け、`db.close()` の後に `<basename>.corrupt-<YYYYMMDDTHHmmssSSSZ>` へ `renameSync`、名前が在れば `-1`・`-2` …、在れば `-journal`・`-wal`・`-shm` も同じく退避、`warn` に退避先の絶対 path を含む 1 行、それ以外の error はそのまま投げる)。todo-storage の Scenario「壊れた file の退避」「退避した file の中身の保持」「退避の後の保存」「同じ時刻の退避名の衝突」「退避の標準エラーへの記録」「directory を指す TODOS_DB_PATH」の題名をそのまま試験名にした試験を足す(衝突は `now` に `2026-09-27T03:15:00.123Z` を返す関数を渡す。標準エラーは `warn` の spy と、`warn` を渡さないときの `console.error` の spy で確かめる)。壊れた file の隣に置いた `<path>-journal` が退避名 + `-journal` に移り、元の path の隣に残らないことの試験も足す。「directory を指す TODOS_DB_PATH」の試験では directory の中に置いた file の中身も変わらないことを確かめる。確かめ方: `pnpm --filter server test` がすべて通る
 
 ## 4. 起動のつなぎと全体の確かめ
 

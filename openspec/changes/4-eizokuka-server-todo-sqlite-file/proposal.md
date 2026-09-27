@@ -29,4 +29,4 @@ server は todo を memory の SQLite に置いているので、再起動のた
 - 依存は足さない(better-sqlite3 と Node の `fs`・`path`・`url` だけ)。`pnpm-lock.yaml` は変わらない。
 - `.gitignore` に `server/data/` を足す。
 - web と画面(Figma、docs/design)は変えない。
-- rubric: [db](memory から file への保存先の変更。Issue が該当とする)、[new-capability-design](`todo-storage` を足す)、[behavior-change](再起動の後も残るという観察できる振る舞いを足す)。
+- rubric: [new-capability-design](`todo-storage` を足す)、[behavior-change](再起動の後も残るという観察できる振る舞いを足す)。[db] は rule の文(schema を足す・変える)には当たらない(table の形を変えない)が、Issue が人の確認を求めているのでそれに従う。どちらにしても [behavior-change] が人の review を求める。
