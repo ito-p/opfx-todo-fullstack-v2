@@ -36,3 +36,4 @@ T1 との違いは todo-list の代わりに empty-message があることだけ
 
 - frame の高さ 400 は見本の器の大きさで、画面は中身の高さに従って伸びる(行が増えれば下へ伸びる)。幅は 480 を上限に中央へ置く。
 - 書体は `"Noto Sans JP", sans-serif` と名指すだけで web font は読み込まない(design.md の D8)。
+- 見出し「todo」の行送りは frame の title の高さ 29 に固定する(`line-height: 29px`)。行送り normal のままだと書体の違いで高さが変わり、add-form が y 69 からずれる。

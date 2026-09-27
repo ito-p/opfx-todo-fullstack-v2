@@ -1,0 +1,13 @@
+packages:
+  - server
+  - web
+
+# 公開から 1 日たっていない版は入れない(手元の pnpm の既定の方針と揃える)
+minimumReleaseAge: 1440
+
+allowBuilds:
+  better-sqlite3: true
+
+# pnpm 10(CI)が読む形。allowBuilds は pnpm 11 以降が読む形。
+onlyBuiltDependencies:
+  - better-sqlite3
