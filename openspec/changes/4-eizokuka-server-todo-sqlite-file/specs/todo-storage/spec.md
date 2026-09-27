@@ -64,7 +64,7 @@ server は環境変数 `TODOS_DB_PATH` が空でない文字列のとき、そ�
 - **THEN** body は空の配列 `[]` で、同じ directory に `.corrupt-` を含む名前の file は作られず、その path に「牛乳を買う」を `POST` した後に起動し直しても一覧に残る
 
 ### Requirement: 壊れた保存の file の退避
-保存の path の file が SQLite の DB として読めないとき(壊れた file)、server はその file の名前を `<元の file の名前>.corrupt-<時刻>` に変えて同じ directory に退避し、元の path に新しい空の DB を作って起動しなければならない(SHALL)。`<時刻>` は UTC の `YYYYMMDDTHHmmssSSSZ`(例 `20260927T031500123Z`)とし、その名前の file が既に在れば `-1`、`-2` … を末尾に足して、既に在る file と重ならない名前にしなければならない(SHALL)。退避した file の中身を変えたり消したりしてはならない(MUST NOT)。退避したとき、退避先の path を含む 1 行を標準エラーに書かなければならない(SHALL)。file が在っても、SQLite の DB として読めないこと以外の理由(例: path が directory を指す)で開けないときは、退避せずに起動を失敗させなければならない(SHALL)。
+保存の path の file が SQLite の DB として読めないとき(壊れた file)、server はその file の名前を `<元の file の名前>.corrupt-<時刻>` に変えて同じ directory に退避し、元の path に新しい空の DB を作って起動しなければならない(SHALL)。`<時刻>` は UTC の `YYYYMMDDTHHmmssSSSZ`(例 `20260927T031500123Z`)とし、その名前の file が既に在れば `-1`、`-2` … を末尾に足して、既に在る file と重ならない名前にしなければならない(SHALL)。退避した file の中身を変えたり消したりしてはならない(MUST NOT)。退避したとき、退避先の path を含む 1 行を標準エラーに書かなければならない(SHALL)。path に在るものが通常の file でない(例: directory)とき、および file が在っても SQLite の DB として読めないこと以外の理由で開けないときは、退避せずに起動を失敗させなければならない(SHALL)。
 
 #### Scenario: 壊れた file の退避
 - **WHEN** 中身が文字列「これは SQLite ではない」の file の path を `TODOS_DB_PATH` に渡して起動し、`GET /api/todos` を呼ぶ

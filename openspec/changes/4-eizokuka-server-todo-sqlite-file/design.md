@@ -4,7 +4,7 @@
 
 Issue 1〜3 の後: `server/src/db.ts` の `openDb(filename = ':memory:')` が better-sqlite3 で DB を開き、`CREATE TABLE IF NOT EXISTS todos (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT NOT NULL, done INTEGER NOT NULL DEFAULT 0)` を走らせる。`server/src/index.ts` は `createApp(openDb())` で memory の DB を渡すので、再起動で todo が消える。`createApp(db)` は DB を受けるだけで、試験(`server/test/todos.test.ts`)は `openDb()` の memory の DB を使う。動機は proposal.md の Why、振る舞いは `specs/todo-storage/spec.md`。
 
-rubric の該当: [db](保存先を memory から file に変える。table の列は変えないが、Issue がこの rule に当たるとしている)、[new-capability-design](`todo-storage`)、[behavior-change]。[api] と [ui] には当たらない(route・応答の形・画面を変えない)。
+rubric の該当: [db] は rule の文(table・列・索引・migration を足す・変える)には当たらない(table の形は変えない)が、Issue が「[db] に当たるので plan は人が見る」としているのでそれに従って人の確認に回す。rule の文に当たるのは [new-capability-design](`todo-storage`)、[behavior-change]。[api] と [ui] には当たらない(route・応答の形・画面を変えない)。
 
 ## 画面
 
@@ -32,7 +32,7 @@ rubric の該当: [db](保存先を memory から file に変える。table の�
 
 `index.ts` は `createApp(openTodosDb(resolveDbPath(process.env)))` にする。
 - 代案: `openDb` に env を読ませて 1 つの関数にする。試験が `process.env` と cwd を書き換えることになり、並んで走る試験どうしが干渉する。引数で渡す方を採る。
-- 代案: 「再起動」の Scenario を実の process(`node dist/index.js`)を起こして試す。build が試験の前に要り、port の取り合いや待ち時間で揺れる。`openTodosDb` で開き → `createApp` → `db.close()` → 同じ path で開き直す、を「server を止めて起動し直す」とみなす。server の状態は DB の file だけにあり(`createApp` は memory に何も持たない)、`index.ts` はこの 2 つの関数をつなぐだけなので、これで足りる。`index.ts` のつなぎは tasks 3.2 で実の起動で確かめる。
+- 代案: 「再起動」の Scenario を実の process(`node dist/index.js`)を起こして試す。build が試験の前に要り、port の取り合いや待ち時間で揺れる。`openTodosDb` で開き → `createApp` → `db.close()` → 同じ path で開き直す、を「server を止めて起動し直す」とみなす。server の状態は DB の file だけにあり(`createApp` は memory に何も持たない)、`index.ts` はこの 2 つの関数をつなぐだけなので、これで足りる。`index.ts` のつなぎは tasks 4.2 で実の起動で確かめる。
 
 ### D2. path の決め方
 - `TODOS_DB_PATH` が空でない文字列 → `path.resolve(cwd, TODOS_DB_PATH)`(相対は cwd 基準、絶対はそのまま)。
@@ -44,8 +44,10 @@ rubric の該当: [db](保存先を memory から file に変える。table の�
 開く前に毎回呼ぶ。既に在れば何もしない。better-sqlite3(SQLite)は無い file は作るが、無い directory は作らないため。
 - 代案: `ENOENT` で失敗してから作って開き直す。分岐が増えるだけなので採らない。
 
-### D4. 壊れた file の見分け方: SQLite の error の code で分ける
-file を開き、`PRAGMA quick_check` を走らせて結果が `ok` でなければ壊れたとする。開く・`quick_check`・`CREATE TABLE IF NOT EXISTS` のどこかで better-sqlite3 の `SqliteError` が出て、その `code` が `SQLITE_NOTADB` か `SQLITE_CORRUPT` で始まるときも壊れたとする。それ以外の error(`SQLITE_CANTOPEN`: path が directory・権限が無い、など)は退避せずにそのまま投げ、起動を失敗させる(spec の「directory を指す TODOS_DB_PATH」)。長さ 0 の file は SQLite が空の DB として開くので、この判定で壊れたとはならない(spec の「長さ 0 の file からの起動」)。
+### D4. 壊れた file の見分け方: 開く前の file の種類の検査と、SQLite の error の code
+まず `fs.statSync(path, { throwIfNoEntry: false })` で path を見る。在って `isFile()` でない(directory・socket など)ときは、SQLite に渡さず、退避もせずに error を投げて起動を失敗させる(spec の「directory を指す TODOS_DB_PATH」)。macOS などで SQLite が directory を読み取り専用で開けてしまい、後の読み込みで `SQLITE_NOTADB` 系の code が出ても directory を退避しないよう、error の code に頼らずに先に止める。無いときは D3 のとおり作る。
+次に file を開き、`PRAGMA quick_check` を走らせて結果が `ok` でなければ壊れたとする。開く・`quick_check`・`CREATE TABLE IF NOT EXISTS` のどこかで better-sqlite3 の `SqliteError` が出て、その `code` が `SQLITE_NOTADB` か `SQLITE_CORRUPT` で始まるときも壊れたとする。それ以外の error(`SQLITE_CANTOPEN`: 権限が無い、など)は退避せずにそのまま投げ、起動を失敗させる。長さ 0 の file は SQLite が空の DB として開くので、この判定で壊れたとはならない(spec の「長さ 0 の file からの起動」)。
+- 代案: file の種類を見ず、error の code の判定だけに任せる。directory を開いたときの code は OS と SQLite の版で違いうる(確かめられていない)ので、directory が `SQLITE_NOTADB` と見なされて退避されうる。`statSync` の 1 回で決まる方を採る。
 - 代案: 開けない error はすべて壊れたとみなして退避する。権限の誤りや一時的な失敗で、読めるはずの利用者の file を退避してしまう。「中身を消さない」を守るため、SQLite が「DB でない・壊れている」と言うときだけに絞る。
 - 代案: `PRAGMA integrity_check`。`quick_check` より遅く(索引の中身まで照合する)、起動のたびに走るので、表の構造を見る `quick_check` を採る。
 - 代案: 先頭 16 byte の `SQLite format 3\0` だけを見る。頭が正しくて中が壊れた file を見逃すので、SQLite 自身の検査に任せる。
@@ -71,7 +73,7 @@ file を開き、`PRAGMA quick_check` を走らせて結果が `ok` でなけれ
 
 ## Risks / Trade-offs
 
-- [D4 の判定が better-sqlite3 の error の code に依る] → spec の Scenario(文字列の file、4096 byte の bytes 列、directory)を試験にし、版が上がって code が変わると試験が落ちて知らせる。
+- [D4 の判定が better-sqlite3 の error の code に依る] → directory など file でないものは code を見る前に `statSync` で止める。壊れた file の側は spec の Scenario(文字列の file、4096 byte の bytes 列)を試験にし、版が上がって code が変わると試験が落ちて知らせる。
 - [既定の path が `import.meta.url` に依るので、`dist/` を別の場所へ移すと既定がずれる] → 配布はこの repo の中で `node dist/index.js` だけなので受け入れる。ずらしたいときは `TODOS_DB_PATH` を渡す。
 - [複数の process が同じ file を開くと、壊れていると誤って見なすことはないが書き込みが競う] → Issue の範囲外。SQLite の lock に任せる。
 - [試験が既定の path の file を作ってしまう] → 既定の path の Scenario は `resolveDbPath` の返す値だけを確かめ、file は開かない。DB を開く試験はすべて一時 directory の path を使い、`afterEach` で消す。
