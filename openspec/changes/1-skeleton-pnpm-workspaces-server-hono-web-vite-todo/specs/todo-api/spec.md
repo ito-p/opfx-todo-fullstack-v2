@@ -47,8 +47,8 @@ API が返す todo は `id`(整数)・`title`(文字列)・`done`(真偽値)の 
 - **THEN** status は 400 で、body は `error` を持ち、`GET /api/todos` の件数は送る前と変わらない
 
 #### Scenario: 空白だけの題名の拒否
-- **WHEN** `POST /api/todos` に `{"title":"   "}`(半角の空白・タブ・改行だけ)を送る
-- **THEN** status は 400 で、body は `error` を持ち、`GET /api/todos` の件数は送る前と変わらない
+- **WHEN** `POST /api/todos` に `{"title":"   "}`(半角の空白だけ)と `{"title":" \t\n "}`(空白・タブ・改行だけ)をそれぞれ送る
+- **THEN** どちらも status は 400 で、body は `error` を持ち、`GET /api/todos` の件数は送る前と変わらない
 
 #### Scenario: 題名の無い body の拒否
 - **WHEN** `POST /api/todos` に `{}` を送る
