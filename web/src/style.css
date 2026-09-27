@@ -1,4 +1,4 @@
-/* 値は docs/design/specs/T1-T1a.md(Figma 2:2・2:16)の写し。 */
+/* 値は docs/design/specs/T1-T1a.md(Figma 2:2・2:16)と T1b.md(5:2)の写し。 */
 *,
 *::before,
 *::after {
@@ -112,6 +112,12 @@ body {
   cursor: pointer;
 }
 
+.checkbox:checked {
+  /* T1b の checkbox(完了)(5:16)。Figma の SVG をそのまま敷く(design.md D7)。 */
+  border: none;
+  background: url('./assets/checkbox-done.svg') center / 20px 20px no-repeat;
+}
+
 .todo-title {
   flex: 1 0 0;
   min-width: 0;
@@ -119,6 +125,12 @@ body {
   font-weight: 400;
   color: #171717;
   overflow-wrap: anywhere;
+}
+
+/* T1b の完了の行の題名(5:11)。 */
+.todo-item[data-done='true'] .todo-title {
+  color: #a3a3a3;
+  text-decoration: line-through solid;
 }
 
 .delete-button {

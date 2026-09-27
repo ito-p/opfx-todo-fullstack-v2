@@ -2,15 +2,27 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Api, Todo } from '../src/api';
 import { mountApp } from '../src/app';
 
-type FakeApi = Api & { listTodos: ReturnType<typeof vi.fn>; createTodo: ReturnType<typeof vi.fn> };
+type FakeApi = Api & {
+  listTodos: ReturnType<typeof vi.fn>;
+  createTodo: ReturnType<typeof vi.fn>;
+  updateTodo: ReturnType<typeof vi.fn>;
+};
 
-const todo = (id: number, title: string): Todo => ({ id, title, done: false });
+const todo = (id: number, title: string, done = false): Todo => ({ id, title, done });
 
-function fakeApi(initial: Todo[], create?: (title: string) => Promise<Todo>): FakeApi {
+function fakeApi(
+  initial: Todo[],
+  create?: (title: string) => Promise<Todo>,
+  update?: (id: number, done: boolean) => Promise<Todo>,
+): FakeApi {
   let next = 100;
+  const byId = new Map(initial.map((t) => [t.id, t]));
   return {
     listTodos: vi.fn(async () => initial),
     createTodo: vi.fn(create ?? (async (title: string) => todo(next++, title))),
+    updateTodo: vi.fn(
+      update ?? (async (id: number, done: boolean) => ({ ...byId.get(id)!, done })),
+    ),
   };
 }
 
@@ -26,6 +38,8 @@ const rows = () => Array.from(root.querySelectorAll<HTMLLIElement>('.todo-item')
 const titles = () => rows().map((r) => r.querySelector('.todo-title')!.textContent);
 const input = () => q<HTMLInputElement>('.title-input')!;
 const flush = () => new Promise((r) => setTimeout(r, 0));
+const checkboxOf = (row: Element) => row.querySelector<HTMLInputElement>('.checkbox')!;
+const isDone = (row: HTMLElement) => row.dataset.done === 'true';
 
 async function submitWith(value: string, how: 'button' | 'enter' = 'button') {
   input().value = value;
@@ -109,20 +123,124 @@ describe('todo-web', () => {
     expect(input().value).toBe('掃除する');
   });
 
-  it('チェックボックスと削除ボタンの無反応', async () => {
+  it('起動時の完了の行', async () => {
+    const api = fakeApi([todo(1, '牛乳を買う', true), todo(2, '掃除する'), todo(3, '本を返す')]);
+    await mountApp(root, api);
+
+    expect(titles()).toEqual(['牛乳を買う', '掃除する', '本を返す']);
+    expect(rows().map(isDone)).toEqual([true, false, false]);
+    expect(rows().map(checkboxOf).map((c) => c.checked)).toEqual([true, false, false]);
+    expect(checkboxOf(rows()[0]).getAttribute('aria-label')).toBe('牛乳を買う を未完了に戻す');
+  });
+
+  it('未完了の行の完了', async () => {
+    const api = fakeApi([todo(1, '牛乳を買う'), todo(2, '掃除する')]);
+    await mountApp(root, api);
+    const second = rows()[1];
+
+    checkboxOf(rows()[0]).click();
+    await flush();
+
+    expect(api.updateTodo).toHaveBeenCalledTimes(1);
+    expect(api.updateTodo).toHaveBeenCalledWith(1, true);
+    expect(titles()).toEqual(['牛乳を買う', '掃除する']);
+    const first = rows()[0];
+    expect(isDone(first)).toBe(true);
+    expect(checkboxOf(first).checked).toBe(true);
+    expect(checkboxOf(first).getAttribute('aria-label')).toBe('牛乳を買う を未完了に戻す');
+    expect(rows()[1]).toBe(second);
+    expect(isDone(second)).toBe(false);
+    expect(checkboxOf(second).checked).toBe(false);
+  });
+
+  it('完了の行の未完了', async () => {
+    const api = fakeApi([todo(1, '牛乳を買う', true)]);
+    await mountApp(root, api);
+
+    checkboxOf(rows()[0]).click();
+    await flush();
+
+    expect(api.updateTodo).toHaveBeenCalledWith(1, false);
+    const row = rows()[0];
+    expect(isDone(row)).toBe(false);
+    expect(checkboxOf(row).checked).toBe(false);
+    expect(checkboxOf(row).getAttribute('aria-label')).toBe('牛乳を買う を完了にする');
+  });
+
+  it('応答待ちの間の再押下', async () => {
+    let resolve!: (t: Todo) => void;
+    const api = fakeApi([todo(1, '牛乳を買う')], undefined, () => new Promise((r) => (resolve = r)));
+    await mountApp(root, api);
+    const checkbox = checkboxOf(rows()[0]);
+
+    checkbox.click();
+    await flush();
+    expect(checkbox.checked).toBe(false);
+    expect(isDone(rows()[0])).toBe(false);
+    checkbox.click();
+    await flush();
+    expect(checkbox.checked).toBe(false);
+    expect(api.updateTodo).toHaveBeenCalledTimes(1);
+
+    resolve(todo(1, '牛乳を買う', true));
+    await flush();
+    expect(isDone(rows()[0])).toBe(true);
+    expect(checkboxOf(rows()[0]).checked).toBe(true);
+    expect(api.updateTodo).toHaveBeenCalledTimes(1);
+  });
+
+  it('切り替えの失敗', async () => {
+    const api = fakeApi([todo(1, '牛乳を買う')], undefined, async (id) => {
+      throw new Error(`PATCH /api/todos/${id}: 404`);
+    });
+    await mountApp(root, api);
+    const row = rows()[0];
+
+    checkboxOf(row).click();
+    await flush();
+
+    expect(rows()[0]).toBe(row);
+    expect(isDone(row)).toBe(false);
+    expect(checkboxOf(row).checked).toBe(false);
+
+    checkboxOf(row).click();
+    await flush();
+    expect(api.updateTodo).toHaveBeenCalledTimes(2);
+    expect(api.updateTodo).toHaveBeenLastCalledWith(1, true);
+  });
+
+  it('切り替えの要求の失敗', async () => {
+    const api = fakeApi([todo(1, '牛乳を買う', true)], undefined, async () => {
+      throw new TypeError('Failed to fetch');
+    });
+    await mountApp(root, api);
+    const row = rows()[0];
+
+    checkboxOf(row).click();
+    await flush();
+
+    expect(rows()[0]).toBe(row);
+    expect(isDone(row)).toBe(true);
+    expect(checkboxOf(row).checked).toBe(true);
+
+    checkboxOf(row).click();
+    await flush();
+    expect(api.updateTodo).toHaveBeenCalledTimes(2);
+    expect(api.updateTodo).toHaveBeenLastCalledWith(1, false);
+  });
+
+  it('削除ボタンの無反応', async () => {
     const api = fakeApi([todo(1, '牛乳を買う')]);
     await mountApp(root, api);
     const before = root.innerHTML;
 
-    const checkbox = q<HTMLInputElement>('.checkbox')!;
-    checkbox.click();
     q<HTMLButtonElement>('.delete-button')!.click();
     await flush();
 
-    expect(checkbox.checked).toBe(false);
     expect(titles()).toEqual(['牛乳を買う']);
     expect(root.innerHTML).toBe(before);
     expect(api.listTodos).toHaveBeenCalledTimes(1);
     expect(api.createTodo).not.toHaveBeenCalled();
+    expect(api.updateTodo).not.toHaveBeenCalled();
   });
 });
