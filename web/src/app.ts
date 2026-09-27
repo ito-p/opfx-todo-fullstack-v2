@@ -16,10 +16,11 @@ function el<K extends keyof HTMLElementTagNameMap>(
 /**
  * T1・T1b の todo-item。`done` で完了の見た目(T1b)を描く。
  * チェックボックスは応答を待ってから描き直し、送信中の再押下は送らない。
- * 削除も応答を待ってから `onDeleted(id)` で知らせ、送信中の再押下は送らない(design.md D4・D6)。
- * 確認のダイアログは出さない。
+ * 削除も応答を待ち、送信中の再押下は送らない(design.md D4・D6)。確認のダイアログは出さない。
+ * 削除の応答が成功したら `onRemoved(id)` を呼ぶだけで、DOM の行には触れない。
+ * 行を DOM から消すことと 0 件の表示(T1a)への切り替えは、呼ぶ側(`mountApp` の `onRemoved`)が受け持つ(design.md D7)。
  */
-function renderItem(todo: Todo, api: Api, onDeleted: (id: number) => void): HTMLLIElement {
+function renderItem(todo: Todo, api: Api, onRemoved: (id: number) => void): HTMLLIElement {
   const item = el('li', 'todo-item');
   item.dataset.id = String(todo.id);
   item.dataset.done = String(todo.done);
@@ -41,7 +42,7 @@ function renderItem(todo: Todo, api: Api, onDeleted: (id: number) => void): HTML
     api
       .updateTodo(todo.id, !todo.done)
       .then(
-        (updated) => item.replaceWith(renderItem(updated, api, onDeleted)),
+        (updated) => item.replaceWith(renderItem(updated, api, onRemoved)),
         () => {
           // 失敗の表示は後の Issue。行は押す前のまま残す。
         },
@@ -60,7 +61,7 @@ function renderItem(todo: Todo, api: Api, onDeleted: (id: number) => void): HTML
     if (deleting) return;
     deleting = true;
     api.deleteTodo(todo.id).then(
-      () => onDeleted(todo.id),
+      () => onRemoved(todo.id),
       () => {
         // 失敗の表示は後の Issue。行は押す前のまま残し、再び押せるようにする。
         deleting = false;
@@ -103,9 +104,10 @@ export function mountApp(root: HTMLElement, api: Api): Promise<void> {
     body.replaceChildren(empty);
   };
 
-  // 切り替えで行が作り直されていても、その id の今の行を消す(design.md D7)。
-  // 行が 0 になったら T1a を描く。
-  const removeRow = (id: number) => {
+  // renderItem が削除の応答の成功の後に呼ぶ callback(design.md D7)。
+  // 行を DOM から消すのはここで、切り替えで行が作り直されていても、その id の今の行を消す。
+  // 行が 0 になったら showEmpty() で T1a に切り替える。
+  const onRemoved = (id: number) => {
     if (!list) return;
     list.querySelector(`.todo-item[data-id="${id}"]`)?.remove();
     if (list.children.length === 0) showEmpty();
@@ -116,7 +118,7 @@ export function mountApp(root: HTMLElement, api: Api): Promise<void> {
       list = el('ul', 'todo-list');
       body.replaceChildren(list);
     }
-    list.append(renderItem(todo, api, removeRow));
+    list.append(renderItem(todo, api, onRemoved));
   };
 
   form.addEventListener('submit', async (event) => {
