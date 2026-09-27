@@ -1,0 +1,8 @@
+{
+  "name": "opfx-todo-fullstack-v2",
+  "private": true,
+  "scripts": {
+    "test": "pnpm -r test",
+    "build": "pnpm -r build"
+  }
+}
