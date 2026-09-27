@@ -94,3 +94,102 @@ describe('todo-api', () => {
     await expectRejected('"a"');
   });
 });
+
+const patch = async (id: unknown, raw: string) => {
+  const res = await app.request(`/api/todos/${id}`, {
+    method: 'PATCH',
+    headers: { 'content-type': 'application/json' },
+    body: raw,
+  });
+  return { status: res.status, body: (await res.json()) as Record<string, unknown> };
+};
+
+const patchDone = (id: unknown, done: unknown) => patch(id, JSON.stringify({ done }));
+
+describe('todo-api 完了の切り替え', () => {
+  it('完了にする', async () => {
+    const made = (await postTitle('牛乳を買う')).body;
+    const res = await patchDone(made.id, true);
+    expect(res).toEqual({ status: 200, body: { id: made.id, title: '牛乳を買う', done: true } });
+  });
+
+  it('未完了に戻す', async () => {
+    const made = (await postTitle('牛乳を買う')).body;
+    await patchDone(made.id, true);
+    const res = await patchDone(made.id, false);
+    expect(res).toEqual({ status: 200, body: { id: made.id, title: '牛乳を買う', done: false } });
+  });
+
+  it('同じ値の再送', async () => {
+    const made = (await postTitle('牛乳を買う')).body;
+    const res = await patchDone(made.id, false);
+    expect(res.status).toBe(200);
+    expect(res.body.done).toBe(false);
+  });
+
+  it('一覧への反映', async () => {
+    const a = (await postTitle('牛乳を買う')).body;
+    const b = (await postTitle('掃除する')).body;
+    await patchDone(b.id, true);
+    expect(await list()).toEqual({
+      status: 200,
+      body: [
+        { id: a.id, title: '牛乳を買う', done: false },
+        { id: b.id, title: '掃除する', done: true },
+      ],
+    });
+  });
+
+  it('done 以外の key の無視', async () => {
+    const made = (await postTitle('牛乳を買う')).body;
+    const res = await patch(made.id, JSON.stringify({ done: true, title: '掃除する', id: 999 }));
+    const expected = { id: made.id, title: '牛乳を買う', done: true };
+    expect(res).toEqual({ status: 200, body: expected });
+    expect((await list()).body).toEqual([expected]);
+  });
+
+  const expectPatchRejected = async (id: unknown, raw: string, status: number) => {
+    const before = (await list()).body;
+    const res = await patch(id, raw);
+    expect(res.status).toBe(status);
+    expect(typeof res.body.error).toBe('string');
+    expect((await list()).body).toEqual(before);
+  };
+
+  it('存在しない id の拒否', async () => {
+    const made = (await postTitle('牛乳を買う')).body;
+    await expectPatchRejected((made.id as number) + 1, JSON.stringify({ done: true }), 404);
+  });
+
+  it('数値として読めない id の拒否', async () => {
+    await postTitle('牛乳を買う');
+    for (const id of ['abc', '1.5', '0', '-1']) {
+      await expectPatchRejected(id, JSON.stringify({ done: true }), 404);
+    }
+  });
+
+  it('存在しない id と不正な body', async () => {
+    const made = (await postTitle('牛乳を買う')).body;
+    await expectPatchRejected((made.id as number) + 1, '{}', 404);
+  });
+
+  it('done の無い body の拒否', async () => {
+    const made = (await postTitle('牛乳を買う')).body;
+    await expectPatchRejected(made.id, '{}', 400);
+    await expectPatchRejected(made.id, JSON.stringify({ title: '掃除する' }), 400);
+  });
+
+  it('真偽値でない done の拒否', async () => {
+    const made = (await postTitle('牛乳を買う')).body;
+    for (const done of ['true', 1, 0, null]) {
+      await expectPatchRejected(made.id, JSON.stringify({ done }), 400);
+    }
+  });
+
+  it('JSON でない完了の body の拒否', async () => {
+    const made = (await postTitle('牛乳を買う')).body;
+    for (const raw of ['done=true', 'true', '[true]']) {
+      await expectPatchRejected(made.id, raw, 400);
+    }
+  });
+});
