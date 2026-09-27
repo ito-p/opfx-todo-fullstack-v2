@@ -13,16 +13,42 @@ function el<K extends keyof HTMLElementTagNameMap>(
   return node;
 }
 
-/** T1 の todo-item。チェックボックスと削除はまだ何もしない(design.md D7)。 */
-function renderItem(todo: Todo): HTMLLIElement {
+/**
+ * T1・T1b の todo-item。`done` で完了の見た目(T1b)を描く。
+ * チェックボックスは応答を待ってから描き直し(design.md D5)、送信中の再押下は送らない(D6)。
+ * 削除はまだ何もしない。
+ */
+function renderItem(todo: Todo, api: Api): HTMLLIElement {
   const item = el('li', 'todo-item');
   item.dataset.id = String(todo.id);
+  item.dataset.done = String(todo.done);
 
   const checkbox = el('input', 'checkbox');
   checkbox.type = 'checkbox';
   checkbox.checked = todo.done;
-  checkbox.setAttribute('aria-label', `${todo.title} を完了にする`);
-  checkbox.addEventListener('click', (event) => event.preventDefault());
+  checkbox.setAttribute(
+    'aria-label',
+    todo.done ? `${todo.title} を未完了に戻す` : `${todo.title} を完了にする`,
+  );
+
+  let sending = false;
+  checkbox.addEventListener('click', (event) => {
+    // 見た目は応答の後に描き直すので、押した瞬間の切り替えは止める。
+    event.preventDefault();
+    if (sending) return;
+    sending = true;
+    api
+      .updateTodo(todo.id, !todo.done)
+      .then(
+        (updated) => item.replaceWith(renderItem(updated, api)),
+        () => {
+          // 失敗の表示は後の Issue。行は押す前のまま残す。
+        },
+      )
+      .finally(() => {
+        sending = false;
+      });
+  });
 
   const title = el('span', 'todo-title', todo.title);
 
@@ -34,7 +60,7 @@ function renderItem(todo: Todo): HTMLLIElement {
 }
 
 /**
- * T1(一覧)と T1a(0 件)を root に描き、起動時の一覧の読み込みを返す。
+ * T1(一覧)・T1a(0 件)・T1b(完了あり)を root に描き、起動時の一覧の読み込みを返す。
  * 読み込みに失敗したときは見出しと form だけを描く(design.md の Non-Goals)。
  */
 export function mountApp(root: HTMLElement, api: Api): Promise<void> {
@@ -69,7 +95,7 @@ export function mountApp(root: HTMLElement, api: Api): Promise<void> {
       list = el('ul', 'todo-list');
       body.replaceChildren(list);
     }
-    list.append(renderItem(todo));
+    list.append(renderItem(todo, api));
   };
 
   form.addEventListener('submit', async (event) => {
