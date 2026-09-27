@@ -85,7 +85,7 @@ frame は Noto Sans JP。`font-family: "Noto Sans JP", sans-serif` と書くだ�
 - 代案: Google Fonts を読む。外部依存が増えるので、必要になれば別の Issue で。
 
 ### D9. workspaces と build
-root の `package.json` は `"test": "pnpm -r test"`、`"build": "pnpm -r build"`。server は `tsc`(`dist/` へ)、web は `tsc --noEmit && vite build`。`pnpm-workspace.yaml` に `packages: [server, web]` と、pnpm 10 が既定で止める install script を better-sqlite3 に許す `onlyBuiltDependencies`。lockfile は CI と同じ pnpm 10 で作る(手元の pnpm 12 の lockfile の形が CI と食い違わないように `npx pnpm@10 install`)。
+root の `package.json` は `"test": "pnpm -r test"`、`"build": "pnpm -r build"`。server は `tsc`(`dist/` へ)、web は `tsc --noEmit && vite build`。`pnpm-workspace.yaml` に `packages: [server, web]` と、pnpm 10 が既定で止める install script を better-sqlite3 に許す `onlyBuiltDependencies`。lockfile は CI と同じ pnpm 10 で作る(手元の pnpm 12 の lockfile の形が CI と食い違わないように `npx pnpm@10 install`)。実装で分かったこと: 手元の pnpm 12 は `onlyBuiltDependencies` を読まず `allowBuilds` を読み、また公開から 1 日たたない版を lockfile に持つと install を拒む。そこで `pnpm-workspace.yaml` に `allowBuilds`(pnpm 11 以降)と `onlyBuiltDependencies`(pnpm 10)の両方を書き、`minimumReleaseAge: 1440` で pnpm 10 の解決も同じ方針に揃える。`.pnpm-store` は `.gitignore` に足す。
 - 代案: `packageManager` で pnpm を固定する。CI の `pnpm/action-setup` の `version: 10` と二重指定になり action が失敗しうるので書かない。
 
 ### D10. Figma の node 名の「checkbox(未完了)」
