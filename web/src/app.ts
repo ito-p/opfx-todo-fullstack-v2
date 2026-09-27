@@ -15,10 +15,11 @@ function el<K extends keyof HTMLElementTagNameMap>(
 
 /**
  * T1・T1b の todo-item。`done` で完了の見た目(T1b)を描く。
- * チェックボックスは応答を待ってから描き直し(design.md D5)、送信中の再押下は送らない(D6)。
- * 削除はまだ何もしない。
+ * チェックボックスは応答を待ってから描き直し、送信中の再押下は送らない。
+ * 削除も応答を待ってから `onDeleted(id)` で知らせ、送信中の再押下は送らない(design.md D4・D6)。
+ * 確認のダイアログは出さない。
  */
-function renderItem(todo: Todo, api: Api): HTMLLIElement {
+function renderItem(todo: Todo, api: Api, onDeleted: (id: number) => void): HTMLLIElement {
   const item = el('li', 'todo-item');
   item.dataset.id = String(todo.id);
   item.dataset.done = String(todo.done);
@@ -40,7 +41,7 @@ function renderItem(todo: Todo, api: Api): HTMLLIElement {
     api
       .updateTodo(todo.id, !todo.done)
       .then(
-        (updated) => item.replaceWith(renderItem(updated, api)),
+        (updated) => item.replaceWith(renderItem(updated, api, onDeleted)),
         () => {
           // 失敗の表示は後の Issue。行は押す前のまま残す。
         },
@@ -54,6 +55,18 @@ function renderItem(todo: Todo, api: Api): HTMLLIElement {
 
   const del = el('button', 'delete-button', '削除');
   del.type = 'button';
+  let deleting = false;
+  del.addEventListener('click', () => {
+    if (deleting) return;
+    deleting = true;
+    api.deleteTodo(todo.id).then(
+      () => onDeleted(todo.id),
+      () => {
+        // 失敗の表示は後の Issue。行は押す前のまま残し、再び押せるようにする。
+        deleting = false;
+      },
+    );
+  });
 
   item.append(checkbox, title, del);
   return item;
@@ -90,12 +103,20 @@ export function mountApp(root: HTMLElement, api: Api): Promise<void> {
     body.replaceChildren(empty);
   };
 
+  // 切り替えで行が作り直されていても、その id の今の行を消す(design.md D7)。
+  // 行が 0 になったら T1a を描く。
+  const removeRow = (id: number) => {
+    if (!list) return;
+    list.querySelector(`.todo-item[data-id="${id}"]`)?.remove();
+    if (list.children.length === 0) showEmpty();
+  };
+
   const append = (todo: Todo) => {
     if (!list) {
       list = el('ul', 'todo-list');
       body.replaceChildren(list);
     }
-    list.append(renderItem(todo, api));
+    list.append(renderItem(todo, api, removeRow));
   };
 
   form.addEventListener('submit', async (event) => {

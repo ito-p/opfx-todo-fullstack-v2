@@ -186,10 +186,107 @@ describe('todo-api 完了の切り替え', () => {
     }
   });
 
+  it('先頭に 0 の付いた id の拒否', async () => {
+    const made = (await postTitle('牛乳を買う')).body;
+    expect(made.id).toBe(1);
+    for (const id of ['01', '001']) {
+      await expectPatchRejected(id, JSON.stringify({ done: true }), 404);
+    }
+  });
+
+  it('PATCH の途中の削除', async () => {
+    const made = (await postTitle('牛乳を買う')).body;
+    const encoder = new TextEncoder();
+    // body が読まれる時(= id の判定の後、更新の前)に todo を消してから JSON を流す。
+    const body = new ReadableStream<Uint8Array>({
+      async pull(controller) {
+        const del = await app.request(`/api/todos/${made.id}`, { method: 'DELETE' });
+        expect(del.status).toBe(204);
+        controller.enqueue(encoder.encode(JSON.stringify({ done: true })));
+        controller.close();
+      },
+    });
+    const res = await app.request(`/api/todos/${made.id}`, {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body,
+      duplex: 'half',
+    } as RequestInit);
+    expect(res.status).toBe(404);
+    expect(typeof ((await res.json()) as Record<string, unknown>).error).toBe('string');
+    expect((await list()).body).toEqual([]);
+  });
+
   it('JSON でない完了の body の拒否', async () => {
     const made = (await postTitle('牛乳を買う')).body;
     for (const raw of ['done=true', 'true', '[true]']) {
       await expectPatchRejected(made.id, raw, 400);
     }
+  });
+});
+
+const del = async (id: unknown) => {
+  const res = await app.request(`/api/todos/${id}`, { method: 'DELETE' });
+  const text = await res.text();
+  return { status: res.status, text };
+};
+
+describe('todo-api 削除', () => {
+  const expectDeleteRejected = async (id: unknown) => {
+    const before = (await list()).body;
+    const res = await del(id);
+    expect(res.status).toBe(404);
+    expect(typeof (JSON.parse(res.text) as Record<string, unknown>).error).toBe('string');
+    expect((await list()).body).toEqual(before);
+  };
+
+  it('存在する todo の削除', async () => {
+    const made = (await postTitle('牛乳を買う')).body;
+    const res = await del(made.id);
+    expect(res.status).toBe(204);
+    expect(res.text.length).toBe(0);
+  });
+
+  it('削除した todo の一覧からの消去', async () => {
+    const a = (await postTitle('牛乳を買う')).body;
+    const b = (await postTitle('掃除する')).body;
+    const c = (await postTitle('本を返す')).body;
+    expect((await del(b.id)).status).toBe(204);
+    expect((await list()).body).toEqual([a, c]);
+  });
+
+  it('最後の 1 件の API での削除', async () => {
+    const made = (await postTitle('牛乳を買う')).body;
+    await del(made.id);
+    expect(await list()).toEqual({ status: 200, body: [] });
+  });
+
+  it('存在しない id の削除', async () => {
+    const made = (await postTitle('牛乳を買う')).body;
+    await expectDeleteRejected((made.id as number) + 1);
+  });
+
+  it('同じ id の 2 回目の削除', async () => {
+    const made = (await postTitle('牛乳を買う')).body;
+    expect((await del(made.id)).status).toBe(204);
+    const second = await del(made.id);
+    expect(second.status).toBe(404);
+    expect(typeof (JSON.parse(second.text) as Record<string, unknown>).error).toBe('string');
+  });
+
+  it('数値として読めない id の削除', async () => {
+    await postTitle('牛乳を買う');
+    for (const id of ['abc', '1.5', '0', '-1']) {
+      await expectDeleteRejected(id);
+    }
+  });
+
+  it('先頭に 0 の付いた id の削除', async () => {
+    const made = (await postTitle('牛乳を買う')).body;
+    expect(made.id).toBe(1);
+    for (const id of ['01', '001']) {
+      await expectDeleteRejected(id);
+    }
+    expect((await list()).body).toEqual([made]);
   });
 });
