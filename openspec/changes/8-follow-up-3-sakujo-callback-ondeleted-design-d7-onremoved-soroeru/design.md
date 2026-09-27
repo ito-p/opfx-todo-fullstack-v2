@@ -25,5 +25,5 @@ D7 の「行を取り除いたことを `mountApp` に知らせる」は、コ�
 
 ## Risks / Trade-offs
 
-- [名前の置き換え漏れ] → `grep -n "onDeleted\|removeRow" web/src` が何も出さないことを確かめる。
+- [名前の置き換え漏れ] → `grep -rn "onDeleted\|removeRow" web/src` が何も出さずに exit 1(該当なし)で終わることを確かめる(`-r` を付けないと素の grep は directory を読まずに exit 2 で終わり、漏れが在っても何も出さないため)。
 - [comment が振る舞いとずれる] → 既存の削除の試験(「削除ボタンでの行の削除」「最後の 1 件の削除」「0 件にした後の追加」「切り替えが先に成功した後の削除の成功(design.md D7)」ほか)を書き換えずに通し、comment の述べる分け方がそのまま試験で確かめられていることを見る。
